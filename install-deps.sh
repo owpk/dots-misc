@@ -20,7 +20,7 @@ function installArchlinuxDeps() {
    fi
    
    # The script begins here.
-   yay -S --noconfirm --needed "$(cat $1)"
+   yay -S --noconfirm --needed $(cat "$1")
 }
 
 if [[ "$DISTR" == 'arch'  ]]; then
