@@ -50,10 +50,10 @@ fi
 DISTR=$(echo $OSSTR | awk '{print tolower($0)}')
 echo $DISTR
 
-echo "Deps dir: $TARGET_DEPS"
+
 
 function installArchlinuxDeps() {
-
+   
    # Install yay
    if ! command -v yay > /dev/null
    then
@@ -65,13 +65,14 @@ function installArchlinuxDeps() {
    	cd $DOT
    	sudo rm -rf yay
    fi
-   
-   # The script begins here.
-   yay -S --noconfirm --needed $(cat $TARGET_DEPS/$1)
+
+   yay -S --noconfirm --needed $(cat $TARGET_DEPS/arch)
 }
 
+echo "Attempt to install dependencies for: $DISTR"
+
 if [[ "$DISTR" == 'arch'  ]]; then
-   installArchlinuxDeps "$DISTR"
+   installArchlinuxDeps
 else 
    echo "Your distro $DIST is not supported yet !!!"
    echo "Please make sure you have installed all needed dependecny manually"
