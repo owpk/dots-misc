@@ -71,7 +71,7 @@ function installArchlinuxDeps() {
 }
 
 if [[ "$DISTR" == 'arch'  ]]; then
-   installArchlinuxDeps "$TARGET_DEPS/$DISTR"
+   installArchlinuxDeps "$DISTR"
 else 
    echo "Your distro $DIST is not supported yet !!!"
    echo "Please make sure you have installed all needed dependecny manually"
