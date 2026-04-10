@@ -1,88 +1,79 @@
-#:!/bin/bash
+#!/bin/bash
 
 TARGET_DEPS=$1
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Detects which OS and if it is Linux then it will detect which Linux Distribution.
-OS=`uname -s`
-REV=`uname -r`
-MACH=`uname -m`
+DISTR="$("$SCRIPT_DIR/get-distro.sh")"
+echo "Detected distro: $DISTR"
 
-GetVersionFromFile()
-{
-        VERSION=`cat $1 | tr "\n" ' ' | sed s/.*VERSION.*=\ // `
+installArchlinuxDeps() {
+    if ! command -v yay > /dev/null; then
+        sudo pacman -Sy --needed git base-devel
+
+        local BUILD_DIR
+        BUILD_DIR=$(mktemp -d)
+
+        git clone https://aur.archlinux.org/yay.git "$BUILD_DIR/yay" || {
+            echo "Error: failed to clone yay repository"
+            rm -rf "$BUILD_DIR"
+            exit 1
+        }
+        (cd "$BUILD_DIR/yay" && makepkg -si) || {
+            echo "Error: failed to build yay"
+            rm -rf "$BUILD_DIR"
+            exit 1
+        }
+        rm -rf "$BUILD_DIR"
+    fi
+
+    yay -S --noconfirm --needed $(cat "$TARGET_DEPS/arch")
 }
 
-if [ "${OS}" = "SunOS" ] ; then
-        OS=Solaris
-        ARCH=`uname -p`
-        OSSTR="${OS} ${REV}(${ARCH} `uname -v`)"
-elif [ "${OS}" = "AIX" ] ; then
-        OSSTR="${OS} `oslevel` (`oslevel -r`)"
-elif [ "${OS}" = "Linux" ] ; then
-        KERNEL=`uname -r`
-        if [ -f /etc/redhat-release ] ; then
-                DIST='RedHat'
-                PSUEDONAME=`cat /etc/redhat-release | sed s/.*\(// | sed s/\)//`
-                REV=`cat /etc/redhat-release | sed s/.*release\ // | sed s/\ .*//`
-        elif [ -f /etc/SuSE-release ] ; then
-                DIST=`cat /etc/SuSE-release | tr "\n" ' '| sed s/VERSION.*//`
-                REV=`cat /etc/SuSE-release | tr "\n" ' ' | sed s/.*=\ //`
-        elif [ -f /etc/mandrake-release ] ; then
-                DIST='Mandrake'
-                PSUEDONAME=`cat /etc/mandrake-release | sed s/.*\(// | sed s/\)//`
-                REV=`cat /etc/mandrake-release | sed s/.*release\ // | sed s/\ .*//`
-        elif [ -f /etc/debian_version ] ; then
-                DIST="Debian `cat /etc/debian_version`"
-                REV=""
-        elif [ -f /etc/arch-release ] ; then
-                DIST="Arch`cat /etc/arch-release`"
-                REV=""
+installDebianDeps() {
+    sudo apt-get update
+    sudo apt-get install -y $(cat "$TARGET_DEPS/debian")
+}
 
-        fi
-        if [ -f /etc/UnitedLinux-release ] ; then
-                DIST="${DIST}[`cat /etc/UnitedLinux-release | tr "\n" ' ' | sed s/VERSION.*//`]"
-        fi
+installFedoraDeps() {
+    sudo dnf install -y $(cat "$TARGET_DEPS/fedora")
+}
 
-        #OSSTR="${OS} ${DIST} ${REV}(${PSUEDONAME} ${KERNEL} ${MACH})"
-        OSSTR="${DIST}"
-fi
+installMacosDeps() {
+    if ! command -v brew > /dev/null; then
+        echo "Homebrew not found, installing..."
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || {
+            echo "Error: failed to install Homebrew"
+            exit 1
+        }
+    fi
 
-DISTR=$(echo $OSSTR | awk '{print tolower($0)}')
-echo $DISTR
-
-
-
-function installArchlinuxDeps() {
-   
-   # Install yay
-   if ! command -v yay > /dev/null
-   then
-   	sudo pacman -Sy --needed git base-devel
-   	git clone https://aur.archlinux.org/yay.git
-   	cd yay
-   	makepkg -si
-   
-   	cd $DOT
-   	sudo rm -rf yay
-   fi
-
-   yay -S --noconfirm --needed $(cat $TARGET_DEPS/arch)
+    brew install $(cat "$TARGET_DEPS/macos")
 }
 
 echo "Attempt to install dependencies for: $DISTR"
 
-if [[ "$DISTR" == 'arch'  ]]; then
-   installArchlinuxDeps
-else 
-   echo "Your distro $DIST is not supported yet !!!"
-   echo "Please make sure you have installed all needed dependecny manually"
-   echo "Check '$TARGET_DEPS' dir for details"
-   echo "You can install all needed dependencies manually and retry this script."
+case "$DISTR" in
+    macos)
+        installMacosDeps
+        ;;
+    arch)
+        installArchlinuxDeps
+        ;;
+    debian|ubuntu|linuxmint|pop)
+        installDebianDeps
+        ;;
+    fedora|rhel|centos)
+        installFedoraDeps
+        ;;
+    *)
+        echo "Your distro '$DISTR' is not supported yet!"
+        echo "Please make sure you have installed all needed dependencies manually."
+        echo "Check '$TARGET_DEPS' dir for details."
 
-   read -p "Are you shure you want to continue? (Y/n)" Y
-
-   case "$Y" in
-      [yY]) ;;
-      *) exit 0 ;;
-   esac
-fi
+        read -rp "Are you sure you want to continue? (Y/n) " Y
+        case "$Y" in
+            [yY]|"") ;;
+            *) exit 0 ;;
+        esac
+        ;;
+esac
